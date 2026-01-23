@@ -30,12 +30,11 @@ jobs:
       - name: Job Summary
         run: |
           echo "## Experiment Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Name:** Panduga Maheswar Reddy" >> $GITHUB_STEP_SUMMARY
           echo "**Roll No:** 2022BCS0185" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Training Logs" >> $GITHUB_STEP_SUMMARY
-          grep -E "MSE|R2" output.txt >> $GITHUB_STEP_SUMMARY || echo "MSE/R2 not found in output" >> $GITHUB_STEP_SUMMARY
+          grep "MSE" output.txt >> $GITHUB_STEP_SUMMARY || true
+          grep "R2" output.txt >> $GITHUB_STEP_SUMMARY || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
