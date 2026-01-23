@@ -1,13 +1,13 @@
-name: Model Training Pipeline
+name: Lab4 CI-CD ML Pipeline
 
 on:
   push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
 jobs:
   train:
+    name: Train ML Model (CI)
     runs-on: ubuntu-latest
 
     steps:
@@ -21,26 +21,107 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run training script
+      - name: Run training
         run: |
-          python train.py > output.txt
+          python train.py
 
-      - name: Job Summary
+      - name: Verify artifacts exist
         run: |
-          echo "## Experiment Results" >> $GITHUB_STEP_SUMMARY
-          echo "**Name:** Panduga Maheswar Reddy" >> $GITHUB_STEP_SUMMARY
-          echo "**Roll No:** 2022BCS0185" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          grep "MSE" output.txt >> $GITHUB_STEP_SUMMARY || true
-          grep "R2" output.txt >> $GITHUB_STEP_SUMMARY || true
+          ls -R
+          test -f artifacts/model.pkl
+          test -f artifacts/metrics.json
 
-      - name: Upload artifacts
+      - name: Upload trained model artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: model-and-results
+          name: experiment-artifacts
           path: |
             artifacts/model.pkl
             artifacts/metrics.json
-            output.txt
+
+  deploy:
+    name: Deploy ML Model (CD)
+    needs: train
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download trained model artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: experiment-artifacts
+          path: artifacts
+
+      - name: Verify downloaded artifacts
+        run: |
+          ls -R artifacts
+          test -f artifacts/model.pkl
+          test -f artifacts/metrics.json
+
+      - name: Compare model metrics (R2 ↑ and MSE ↓)
+        run: |
+          python <<EOF
+          import json, os
+
+          with open("artifacts/metrics.json") as f:
+              m = json.load(f)
+
+          cur_r2 = float(m["r2"])
+          cur_mse = float(m["mse"])
+
+          best_r2 = float(os.environ.get("BEST_R2", 0))
+          best_mse = float(os.environ.get("BEST_MSE", 999999))
+
+          print("Current R2:", cur_r2)
+          print("Best R2:", best_r2)
+          print("Current MSE:", cur_mse)
+          print("Best MSE:", best_mse)
+
+          if cur_r2 <= best_r2 or cur_mse >= best_mse:
+              print("2022BCS0185 ---- Metrics did not improve")
+              exit(0)
+
+          # export values for later steps
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"NEW_R2={cur_r2}\n")
+              env.write(f"NEW_MSE={cur_mse}\n")
+
+          print("Metrics improved  Proceeding with deployment.")
+          EOF
+        env:
+          BEST_R2: ${{ vars.BEST_R2 }}
+          BEST_MSE: ${{ vars.BEST_MSE }}
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_TOKEN }}" | docker login \
+            -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/wine_predict_2022bcs0185:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/wine_predict_2022bcs0185:latest
+
+      - name: Update BEST_R2 variable
+        run: |
+          curl -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_R2 \
+            -d "{\"name\":\"BEST_R2\",\"value\":\"${NEW_R2}\"}"
+
+      - name: Update BEST_MSE variable
+        run: |
+          curl -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_MSE \
+            -d "{\"name\":\"BEST_MSE\",\"value\":\"${NEW_MSE}\"}"
