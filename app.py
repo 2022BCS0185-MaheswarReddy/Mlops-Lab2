@@ -46,9 +46,13 @@ def predict(
     sulphates: float,
     alcohol: float
 ):
-features = np.array([[fixed_acidity, volatile_acidity, citric_acid,
-                      residual_sugar, chlorides, free_sulfur_dioxide,
-                      total_sulfur_dioxide, density, ph, sulphates, alcohol]])
+features = np.array([[
+    fixed_acidity,
+    volatile_acidity,
+    citric_acid,
+    alcohol
+]])
+
 prediction = model.predict(features)
 
     return {
