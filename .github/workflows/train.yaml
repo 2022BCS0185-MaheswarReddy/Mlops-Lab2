@@ -64,6 +64,7 @@ jobs:
           test -f artifacts/metrics.json
 
       - name: Compare model metrics (R2 ↑ and MSE ↓)
+        id: compare
         run: |
           python <<EOF
           import json, os
@@ -82,46 +83,55 @@ jobs:
           print("Current MSE:", cur_mse)
           print("Best MSE:", best_mse)
 
-          if cur_r2 <= best_r2 or cur_mse >= best_mse:
-              print("2022BCS0185 ---- Metrics did not improve")
-              exit(0)
+          improved = (cur_r2 > best_r2) and (cur_mse < best_mse)
 
-          # export values for later steps
-          with open(os.environ["GITHUB_ENV"], "a") as env:
-              env.write(f"NEW_R2={cur_r2}\n")
-              env.write(f"NEW_MSE={cur_mse}\n")
+          # Output for next steps
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"improved={str(improved).lower()}\n")
+              out.write(f"new_r2={cur_r2}\n")
+              out.write(f"new_mse={cur_mse}\n")
 
-          print("Metrics improved  Proceeding with deployment.")
+          if not improved:
+              print("2022BCS0185 ---- Metrics did not improve. Deployment will be skipped.")
+          else:
+              print(" Metrics improved. Proceeding with deployment.")
           EOF
         env:
           BEST_R2: ${{ vars.BEST_R2 }}
           BEST_MSE: ${{ vars.BEST_MSE }}
 
+      # Only deploy if improved = true
       - name: Login to Docker Hub
+        if: ${{ steps.compare.outputs.improved == 'true' }}
         run: |
           echo "${{ secrets.DOCKER_TOKEN }}" | docker login \
             -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build Docker image
+        if: ${{ steps.compare.outputs.improved == 'true' }}
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/wine_predict_2022bcs0185:latest .
 
       - name: Push Docker image
+        if: ${{ steps.compare.outputs.improved == 'true' }}
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/wine_predict_2022bcs0185:latest
 
+      #  Update variables only if deployment happens
       - name: Update BEST_R2 variable
+        if: ${{ steps.compare.outputs.improved == 'true' }}
         run: |
           curl -X PATCH \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_R2 \
-            -d "{\"name\":\"BEST_R2\",\"value\":\"${NEW_R2}\"}"
+            -d "{\"name\":\"BEST_R2\",\"value\":\"${{ steps.compare.outputs.new_r2 }}\"}"
 
       - name: Update BEST_MSE variable
+        if: ${{ steps.compare.outputs.improved == 'true' }}
         run: |
           curl -X PATCH \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_MSE \
-            -d "{\"name\":\"BEST_MSE\",\"value\":\"${NEW_MSE}\"}"
+            -d "{\"name\":\"BEST_MSE\",\"value\":\"${{ steps.compare.outputs.new_mse }}\"}"
