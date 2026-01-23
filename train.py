@@ -10,6 +10,10 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error, r2_score
 
+import os
+import json
+import joblib
+
 # -------------------------
 # Create output directories
 # -------------------------
@@ -83,3 +87,24 @@ results = {
 
 with open("output/results/results.json", "w") as f:
     json.dump(results, f, indent=4)
+
+
+
+
+
+
+os.makedirs("artifacts", exist_ok=True)
+
+# Save model
+joblib.dump(model, "artifacts/model.pkl")
+
+# Save metrics
+metrics = {
+    "mse": mse,
+    "r2": r2
+}
+with open("artifacts/metrics.json", "w") as f:
+    json.dump(metrics, f, indent=4)
+
+print("Saved model to artifacts/model.pkl")
+print("Saved metrics to artifacts/metrics.json")
