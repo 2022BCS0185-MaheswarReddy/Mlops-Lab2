@@ -14,7 +14,7 @@ model_path = os.path.abspath(
 )
 
 # -----------------------------
-# Load model ONCE
+# Load model ONCE (important)
 # -----------------------------
 model = joblib.load(model_path)
 
@@ -26,17 +26,36 @@ def read_root():
     return RedirectResponse(url="/docs")
 
 # -----------------------------
-# Prediction endpoint
+# Prediction endpoint (GET)
 # -----------------------------
 @app.get("/predict")
 def predict(
     fixed_acidity: float,
     volatile_acidity: float,
     citric_acid: float,
+    residual_sugar: float,
+    chlorides: float,
+    free_sulfur_dioxide: float,
+    total_sulfur_dioxide: float,
+    density: float,
+    ph: float,
+    sulphates: float,
     alcohol: float
 ):
-    #  Must match train.py features order
-    features = np.array([[fixed_acidity, volatile_acidity, citric_acid, alcohol]])
+
+    features = np.array([[
+        fixed_acidity,
+        volatile_acidity,
+        citric_acid,
+        residual_sugar,
+        chlorides,
+        free_sulfur_dioxide,
+        total_sulfur_dioxide,
+        density,
+        ph,
+        sulphates,
+        alcohol
+    ]])
 
     prediction = model.predict(features)[0]
 
