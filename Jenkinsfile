@@ -16,25 +16,25 @@ pipeline {
             }
         }
 
-        stage('Setup Python Virtual Environment') {
-            steps {
-                sh '''
-                python3 -m venv venv
-                . venv/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
-                '''
-            }
-        }
+       stage('Setup Python Virtual Environment') {
+    steps {
+        sh '''
+        python3 -m venv venv
+        venv/bin/pip install --upgrade pip
+        venv/bin/pip install -r requirements.txt
+        '''
+    }
+}
 
-        stage('Train Model') {
-            steps {
-                sh '''
-                . venv/bin/activate
-                python train.py
-                '''
-            }
-        }
+
+     stage('Train Model') {
+    steps {
+        sh '''
+        venv/bin/python train.py
+        '''
+    }
+}
+
 
         stage('Read Accuracy') {
             steps {
@@ -88,6 +88,10 @@ pipeline {
             }
         }
     }
+ACCURACY = sh(
+    script: "jq -r '.r2' artifacts/metrics.json",
+    returnStdout: true
+).trim()
 
     post {
         always {
