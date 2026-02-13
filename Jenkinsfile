@@ -40,9 +40,10 @@ pipeline {
             steps {
                 script {
                     ACCURACY = sh(
-                        script: "jq '.r2' artifacts/metrics.json",
-                        returnStdout: true
-                    ).trim()
+    script: "jq -r '.r2' artifacts/metrics.json",
+    returnStdout: true
+).trim()
+
                     echo "Current Accuracy: ${ACCURACY}"
                 }
             }
@@ -88,10 +89,7 @@ pipeline {
             }
         }
     }
-ACCURACY = sh(
-    script: "jq -r '.r2' artifacts/metrics.json",
-    returnStdout: true
-).trim()
+
 
     post {
         always {
