@@ -14,8 +14,10 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git credentialsId: 'git-creds',
-                    url: 'https://github.com/2022BCS0185-MaheswarReddy/Mlops-Lab2.git'
+                git branch: 'main',
+    credentialsId: 'git-creds',
+    url: 'https://github.com/2022BCS0185-MaheswarReddy/Mlops-Lab2.git'
+
             }
         }
 
